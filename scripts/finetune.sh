@@ -1,0 +1,11 @@
+CUDA_VISIBLE_DEVICES=0 python train.py \
+  --epochs 100 \
+  --workers 4 \
+  --device 0 \
+  --batch-size 12 \
+  --data data/gender.yaml \
+  --img 640 640 \
+  --cfg cfg/training/yolov7.yaml \
+  --name 'finetune-gender-2k' \
+  --hyp data/hyp.scratch.custom.yaml \
+  --weight pretrain-crowd/best.pt

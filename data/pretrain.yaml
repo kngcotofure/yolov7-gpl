@@ -1,0 +1,8 @@
+train: ../yolov7-face/datahub/coco_wholebody/images/train
+val: ../yolov7-face/datahub/coco_wholebody/images/val
+
+# number of classes
+nc: 1
+
+# class names
+names: ['human']
