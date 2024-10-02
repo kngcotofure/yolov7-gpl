@@ -605,6 +605,45 @@ def box_diou(box1, box2, eps: float = 1e-7):
     return iou - (centers_distance_squared / diagonal_distance_squared)
 
 
+def find_pair_similarity(prediction, threshold=20):
+    """
+      Find the similarity score of two bounding boxes.
+      Args:
+        tensor: prediction matrix [bbox, score, cls]
+        threshold(Optional, int): A threshold between two bbox
+      Returns:
+        similarity_pair: index in tensor matrix has similarity score less than threshold
+        indices: index in tensor matrix
+    """
+    if not isinstance(prediction, np.ndarray):
+        prediction = prediction.cpu().detach().numpy()
+    
+    similar_pairs = []
+    bboxes, cls = prediction[:, :4], prediction[:, 5]
+
+    # Calculate the pairwise distances using broadcasting
+    # Expand dimensions to enable broadcasting
+    bboxes_expanded_1 = bboxes[:, np.newaxis, :]  # Shape: (N, 1, 4)
+    bboxes_expanded_2 = bboxes[np.newaxis, :, :]  # Shape: (1, N, 4)
+
+    # Calculate Euclidean distane (square) differences
+    squared_diff = (bboxes_expanded_1 - bboxes_expanded_2) ** 2
+    distances_squared = np.sum(squared_diff, axis=-1)  # Shape: (N, N)
+
+    # Get indices of pairs where distance is less than threshold
+    threshold_squared = threshold ** 2
+    pairs = np.argwhere(distances_squared < threshold_squared)
+
+    # Filter sample
+    similar_pairs, indices = [], []
+    for i, j in pairs:
+      if i < j:
+        similar_pairs.append((i, j))
+        indices.append(i if cls[i] > cls[j] else j)
+
+    return similar_pairs, indices
+
+
 def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=None, agnostic=False, multi_label=False,
                         labels=()):
     """Runs Non-Maximum Suppression (NMS) on inference results
