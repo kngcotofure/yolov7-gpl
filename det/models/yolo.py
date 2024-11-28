@@ -313,6 +313,8 @@ class ClassificationModel(BaseModel):
         # Create a YOLOv5 classification model from a YOLOv5 detection model
         if isinstance(model, DetectMultiBackend):
             model = model.model  # unwrap DetectMultiBackend
+
+        d = model.yaml
         model.model = model.model[:cutoff]  # backbone
         m = model.model[-1]  # last layer
         ch = m.conv.in_channels if hasattr(m, 'conv') else m.cv1.conv.in_channels  # ch into module
@@ -321,13 +323,18 @@ class ClassificationModel(BaseModel):
         model.model[-1] = c  # replace
         self.model = model.model
         self.stride = model.stride
-        self.save = []
+
+        save = []
+        for i, (f, n, m, args) in enumerate(d['backbone']):  # from, number, module, args
+          save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
+        
+        self.save = save[:cutoff]
         self.nc = nc
 
     def _from_yaml(self, cfg):
         # Create a YOLOv5 classification model from a *.yaml file
         self.model = None
-
+        
 
 def parse_model(d, ch):  # model_dict, input_channels(3)
     LOGGER.info(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")
