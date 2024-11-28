@@ -255,7 +255,7 @@ class GenericLogger:
             self.tb = SummaryWriter(str(self.save_dir))
 
         if wandb and 'wandb' in self.include:
-            self.wandb = wandb.init(project="YOLOv5-Classifier" if opt.project == "runs/train" else opt.project,
+            self.wandb = wandb.init(project="YOLOv7-Classifier",
                                     name=None if opt.name == "exp" else opt.name,
                                     config=opt)
         else:
