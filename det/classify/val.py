@@ -25,6 +25,9 @@ from utils.dataloaders import create_classification_dataloader
 from utils.general import LOGGER, check_img_size, check_requirements, colorstr, increment_path, print_args
 from utils.torch_utils import select_device, smart_inference_mode, time_sync
 
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+
 
 @smart_inference_mode()
 def run(
@@ -80,7 +83,6 @@ def run(
                                                       augment=False,
                                                       rank=-1,
                                                       workers=workers)
-
     model.eval()
     pred, targets, loss, dt = [], [], 0, [0.0, 0.0, 0.0]
     n = len(dataloader)  # number of batches
@@ -99,6 +101,7 @@ def run(
             dt[1] += t3 - t2
 
             pred.append(y.argsort(1, descending=True)[:, :5])
+            
             targets.append(labels)
             if criterion:
                 loss += criterion(y, labels)
@@ -109,6 +112,20 @@ def run(
     correct = (targets[:, None] == pred).float()
     acc = torch.stack((correct[:, 0], correct.max(1).values), dim=1)  # (top1, top5) accuracy
     top1, top5 = acc.mean(0).tolist()
+
+    tgt_np = targets.detach().cpu().numpy()
+    pred_np = pred[:, 0].detach().cpu().numpy()
+
+    # classification
+    print("Classification report: \n", classification_report(tgt_np, pred_np, target_names=model.names))
+    
+    cm = confusion_matrix(tgt_np, pred_np)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.names)
+
+    # Save the confusion matrix to a file
+    disp.plot(cmap='Blues')  # You can specify a color map if you'd like, like 'Blues' for better visualization
+    plt.savefig("confusion_matrix.png")  # Save the confusion matrix as a PNG file
+    plt.close()  # Close the plot to free memory
 
     if pbar:
         pbar.desc = f"{pbar.desc[:-36]}{loss:>12.3g}{top1:>12.3g}{top5:>12.3g}"
