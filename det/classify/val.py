@@ -25,6 +25,8 @@ from utils.dataloaders import create_classification_dataloader
 from utils.general import LOGGER, check_img_size, check_requirements, colorstr, increment_path, print_args
 from utils.torch_utils import select_device, smart_inference_mode, time_sync
 
+
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
@@ -118,13 +120,15 @@ def run(
 
     # classification
     print("Classification report: \n", classification_report(tgt_np, pred_np, target_names=model.names))
-    
+    # clsf_report = pd.DataFrame(classification_report(y_true = tgt_np, y_pred = pred_np, output_dict=True)).transpose()
+    # clsf_report.to_csv(f'{save_dir}/classification_report.csv', index= True)
+
     cm = confusion_matrix(tgt_np, pred_np)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.names)
 
     # Save the confusion matrix to a file
     disp.plot(cmap='Blues')  # You can specify a color map if you'd like, like 'Blues' for better visualization
-    plt.savefig("confusion_matrix.png")  # Save the confusion matrix as a PNG file
+    plt.savefig(f"{save_dir}/confusion_matrix.png")  # Save the confusion matrix as a PNG file
     plt.close()  # Close the plot to free memory
 
     if pbar:

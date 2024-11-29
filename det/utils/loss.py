@@ -5,6 +5,8 @@ Loss functions
 
 import torch
 import torch.nn as nn
+import numpy as np
+import torch.nn.functional as F
 
 from utils.metrics import bbox_iou
 from utils.torch_utils import de_parallel
@@ -232,3 +234,67 @@ class ComputeLoss:
             tcls.append(c)  # class
 
         return tcls, tbox, indices, anch
+
+
+class LDAMLoss(nn.Module):
+    # https://github.com/kaidic/LDAM-DRW/blob/master/losses.py
+    def __init__(self, cls_num_list, max_m=0.5, weight=None, s=30):
+        super(LDAMLoss, self).__init__()
+        m_list = 1.0 / np.sqrt(np.sqrt(cls_num_list))
+        m_list = m_list * (max_m / np.max(m_list))
+        m_list = torch.cuda.FloatTensor(m_list)
+        self.m_list = m_list
+        assert s > 0
+        self.s = s
+        self.weight = weight
+
+    def forward(self, x, target):
+        index = torch.zeros_like(x, dtype=torch.uint8)
+        index.scatter_(1, target.data.view(-1, 1), 1)
+        
+        index_float = index.type(torch.cuda.FloatTensor)
+        batch_m = torch.matmul(self.m_list[None, :], index_float.transpose(0,1))
+        batch_m = batch_m.view((-1, 1))
+        x_m = x - batch_m
+    
+        output = torch.where(index, x_m, x)
+        return F.cross_entropy(self.s*output, target, weight=self.weight)
+    
+class ELMLoss(nn.Module):
+    # https://github.com/usagisukisuki/ELMloss/blob/main/loss.py
+    def __init__(self, cls_num_list, max_m=0.5, lamda=1.0, weight=None, s=30):
+        super(ELMLoss, self).__init__()
+        m_list = 1.0 / np.sqrt(np.sqrt(cls_num_list))
+        m_list = m_list * (max_m / np.max(m_list))
+        m_list = torch.cuda.FloatTensor(m_list)
+        self.m_list = m_list
+        assert s > 0
+        self.s = s
+        self.weight = weight
+        self.lamda = lamda 
+
+    def forward(self, x, target):
+        ### true class ###
+        index = torch.zeros_like(x, dtype=torch.uint8)
+        index.scatter_(1, target.data.view(-1, 1), 1)
+        index_float = index.type(torch.cuda.FloatTensor)
+
+        ### maximum other class ###
+        x_ = x.clone()
+        ones = torch.ones_like(x_, dtype=torch.uint8) * 1e+8 * -1
+        x_ = torch.where(index, ones, x_)
+        x_ = x_.argmax(dim=1)
+        index2 = torch.zeros_like(x, dtype=torch.uint8)
+        index2.scatter_(1, x_.data.view(-1, 1), 1)
+        index_float2 = index2.type(torch.cuda.FloatTensor)
+
+        ### settting large margin ###
+        batch_m1 = torch.matmul(self.m_list[None, :], index_float.transpose(0,1))
+        batch_m1 = batch_m1.view((-1, 1))
+        batch_m2 = torch.matmul(self.m_list[None, :], index_float2.transpose(0,1))
+        batch_m2 = batch_m2.view((-1, 1))
+
+        x_m = x - batch_m1 + batch_m2*self.lamda
+        output = torch.where(index, x_m, x)
+
+        return F.cross_entropy(self.s*output, target, weight=self.weight)

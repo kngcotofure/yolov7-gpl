@@ -41,6 +41,7 @@ from utils.loggers import GenericLogger
 from utils.plots import imshow_cls
 from utils.torch_utils import (ModelEMA, model_info, reshape_classifier_output, select_device, smart_DDP,
                                smart_optimizer, smartCrossEntropyLoss, torch_distributed_zero_first)
+from utils.loss import ELMLoss, LDAMLoss
 
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
@@ -153,7 +154,14 @@ def train(opt, device):
 
     # Train
     t0 = time.time()
-    criterion = smartCrossEntropyLoss(label_smoothing=opt.label_smoothing)  # loss function
+    # ELMLoss, LDAMLoss
+    if opt.loss == 'elmloss':
+        criterion = ELMLoss(cls_num_list=nc)
+    elif opt.loss == 'ldamloss':
+        criterion = LDAMLoss(cls_num_list=nc)
+    else:
+        criterion = smartCrossEntropyLoss(label_smoothing=opt.label_smoothing)  # loss function
+        
     best_fitness = 0.0
     scaler = amp.GradScaler(enabled=cuda)
     val = test_dir.stem  # 'val' or 'test'
@@ -284,6 +292,7 @@ def parse_opt(known=False):
     parser.add_argument('--verbose', action='store_true', help='Verbose mode')
     parser.add_argument('--seed', type=int, default=0, help='Global training seed')
     parser.add_argument('--local_rank', '--local-rank', type=int, default=-1, help='Automatic DDP Multi-GPU argument, do not modify')
+    parser.add_argument('--loss', choices=['elmloss', 'ldamloss', 'celoss'], default='celoss', help='Loss type celoss')
     return parser.parse_known_args()[0] if known else parser.parse_args()
 
 
