@@ -89,6 +89,7 @@ def train(opt, device):
                                                    cache=opt.cache,
                                                    rank=LOCAL_RANK,
                                                    workers=nw)
+    trainloader.dataset.classes = model.names = list(trainloader.dataset.targets.values())  # attach class names
 
     test_dir = data_dir / 'test' if (data_dir / 'test').exists() else data_dir / 'val'  # data/test or data/val
     if RANK in {-1, 0}:
@@ -99,6 +100,7 @@ def train(opt, device):
                                                       cache=opt.cache,
                                                       rank=-1,
                                                       workers=nw)
+        testloader.dataset.classes = list(trainloader.dataset.targets.values())
 
     dict_name = trainloader.dataset.num_per_cls_dict  # class names
     names = [str(i) for i in dict_name]
@@ -129,7 +131,6 @@ def train(opt, device):
         if isinstance(m, torch.nn.Dropout) and opt.dropout is not None:
             m.p = opt.dropout  # set dropout
     model = model.to(device)
-    testloader.dataset.classes = trainloader.dataset.classes = model.names = list(trainloader.dataset.targets.values())  # attach class names
 
     # Info
     if RANK in {-1, 0}:
