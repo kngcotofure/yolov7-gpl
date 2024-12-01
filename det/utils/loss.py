@@ -266,7 +266,7 @@ class ELMLoss(nn.Module):
         super(ELMLoss, self).__init__()
         m_list = 1.0 / np.sqrt(np.sqrt(cls_num_list))
         m_list = m_list * (max_m / np.max(m_list))
-        m_list = torch.cuda.FloatTensor(m_list)
+        m_list = torch.cuda.FloatTensor(m_list) if torch.cuda.is_available() else torch.FloatTensor(m_list)
         self.m_list = m_list
         assert s > 0
         self.s = s

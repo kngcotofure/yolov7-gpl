@@ -115,21 +115,21 @@ def run(
     acc = torch.stack((correct[:, 0], correct.max(1).values), dim=1)  # (top1, top5) accuracy
     top1, top5 = acc.mean(0).tolist()
 
-    tgt_np = targets.detach().cpu().numpy()
-    pred_np = pred[:, 0].detach().cpu().numpy()
+    # tgt_np = targets.detach().cpu().numpy()
+    # pred_np = pred[:, 0].detach().cpu().numpy()
 
-    # classification
-    print("Classification report: \n", classification_report(tgt_np, pred_np, target_names=model.names))
-    # clsf_report = pd.DataFrame(classification_report(y_true = tgt_np, y_pred = pred_np, output_dict=True)).transpose()
-    # clsf_report.to_csv(f'{save_dir}/classification_report.csv', index= True)
+    # if verbose:
+    #     print("Classification report: \n", classification_report(tgt_np, pred_np, target_names=model.names))
+    #     # clsf_report = pd.DataFrame(classification_report(y_true = tgt_np, y_pred = pred_np, output_dict=True)).transpose()
+    #     # clsf_report.to_csv(f'{save_dir}/classification_report.csv', index= True)
 
-    cm = confusion_matrix(tgt_np, pred_np)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.names)
+    #     cm = confusion_matrix(tgt_np, pred_np)
+    #     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.names)
 
-    # Save the confusion matrix to a file
-    disp.plot(cmap='Blues')  # You can specify a color map if you'd like, like 'Blues' for better visualization
-    plt.savefig(f"{save_dir}/confusion_matrix.png")  # Save the confusion matrix as a PNG file
-    plt.close()  # Close the plot to free memory
+    #     # Save the confusion matrix to a file
+    #     disp.plot(cmap='Blues')  # You can specify a color map if you'd like, like 'Blues' for better visualization
+    #     plt.savefig(f"{save_dir}/confusion_matrix.png")  # Save the confusion matrix as a PNG file
+    #     plt.close()  # Close the plot to free memory
 
     if pbar:
         pbar.desc = f"{pbar.desc[:-36]}{loss:>12.3g}{top1:>12.3g}{top5:>12.3g}"

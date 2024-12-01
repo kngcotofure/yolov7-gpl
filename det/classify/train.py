@@ -81,7 +81,7 @@ def train(opt, device):
             LOGGER.info(s)
 
     # Dataloaders
-    nc = len([x for x in (data_dir / 'train').glob('*') if x.is_dir()])  # number of classes
+    # nc = len([x for x in (data_dir / 'train').glob('*') if x.is_dir()])  # number of classes
     trainloader = create_classification_dataloader(path=data_dir / 'train',
                                                    imgsz=imgsz,
                                                    batch_size=bs // WORLD_SIZE,
@@ -99,6 +99,14 @@ def train(opt, device):
                                                       cache=opt.cache,
                                                       rank=-1,
                                                       workers=nw)
+
+    dict_name = trainloader.dataset.num_per_cls_dict  # class names
+    names = [str(i) for i in dict_name]
+   
+    for name in names:
+        with open(f'{save_dir}/classes.txt', 'w') as f:
+              f.writelines(name + '\n')
+    nc = len(names)
 
     # Model
     with torch_distributed_zero_first(LOCAL_RANK), WorkingDirectory(ROOT):
@@ -121,8 +129,7 @@ def train(opt, device):
         if isinstance(m, torch.nn.Dropout) and opt.dropout is not None:
             m.p = opt.dropout  # set dropout
     model = model.to(device)
-    names = trainloader.dataset.classes  # class names
-    model.names = names  # attach class names
+    testloader.dataset.classes = trainloader.dataset.classes = model.names = list(trainloader.dataset.targets.values())  # attach class names
 
     # Info
     if RANK in {-1, 0}:
@@ -154,11 +161,12 @@ def train(opt, device):
 
     # Train
     t0 = time.time()
+    cls_num_list = trainloader.dataset.get_cls_num_list()
     # ELMLoss, LDAMLoss
     if opt.loss == 'elmloss':
-        criterion = ELMLoss(cls_num_list=nc)
+        criterion = ELMLoss(cls_num_list=cls_num_list)
     elif opt.loss == 'ldamloss':
-        criterion = LDAMLoss(cls_num_list=nc)
+        criterion = LDAMLoss(cls_num_list=cls_num_list)
     else:
         criterion = smartCrossEntropyLoss(label_smoothing=opt.label_smoothing)  # loss function
         
