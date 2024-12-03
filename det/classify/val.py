@@ -49,6 +49,7 @@ def run(
     dataloader=None,
     criterion=None,
     pbar=None,
+    save_dir = None
 ):
     # Initialize/load model and set device
     training = model is not None
@@ -58,10 +59,6 @@ def run(
         model.half() if half else model.float()
     else:  # called directly
         device = select_device(device, batch_size=batch_size)
-
-        # Directories
-        save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-        save_dir.mkdir(parents=True, exist_ok=True)  # make dir
 
         # Load model
         model = DetectMultiBackend(weights, device=device, dnn=dnn, fp16=half)
@@ -85,6 +82,11 @@ def run(
                                                       augment=False,
                                                       rank=-1,
                                                       workers=workers)
+    if save_dir is None:
+        # Directories
+        save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+        save_dir.mkdir(parents=True, exist_ok=True)  # make dir
+    
     model.eval()
     pred, targets, loss, dt = [], [], 0, [0.0, 0.0, 0.0]
     n = len(dataloader)  # number of batches
@@ -110,29 +112,20 @@ def run(
             dt[2] += time_sync() - t3
 
     loss /= n
+    if isinstance(loss, torch.Tensor):
+        loss = loss.item()
     pred, targets = torch.cat(pred), torch.cat(targets)
     correct = (targets[:, None] == pred).float()
     acc = torch.stack((correct[:, 0], correct.max(1).values), dim=1)  # (top1, top5) accuracy
     top1, top5 = acc.mean(0).tolist()
-
-    # tgt_np = targets.detach().cpu().numpy()
-    # pred_np = pred[:, 0].detach().cpu().numpy()
-
-    # if verbose:
-    #     print("Classification report: \n", classification_report(tgt_np, pred_np, target_names=model.names))
-    #     # clsf_report = pd.DataFrame(classification_report(y_true = tgt_np, y_pred = pred_np, output_dict=True)).transpose()
-    #     # clsf_report.to_csv(f'{save_dir}/classification_report.csv', index= True)
-
-    #     cm = confusion_matrix(tgt_np, pred_np)
-    #     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.names)
-
-    #     # Save the confusion matrix to a file
-    #     disp.plot(cmap='Blues')  # You can specify a color map if you'd like, like 'Blues' for better visualization
-    #     plt.savefig(f"{save_dir}/confusion_matrix.png")  # Save the confusion matrix as a PNG file
-    #     plt.close()  # Close the plot to free memory
+    
+    if verbose:
+        tgt_np = targets.detach().cpu().numpy()
+        pred_np = pred[:, 0].detach().cpu().numpy()
 
     if pbar:
         pbar.desc = f"{pbar.desc[:-36]}{loss:>12.3g}{top1:>12.3g}{top5:>12.3g}"
+        
     if verbose:  # all classes
         LOGGER.info(f"{'Class':>24}{'Images':>12}{'top1_acc':>12}{'top5_acc':>12}")
         LOGGER.info(f"{'all':>24}{targets.shape[0]:>12}{top1:>12.3g}{top5:>12.3g}")
@@ -145,7 +138,20 @@ def run(
         t = tuple(x / len(dataloader.dataset.samples) * 1E3 for x in dt)  # speeds per image
         shape = (1, 3, imgsz, imgsz)
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms post-process per image at shape {shape}' % t)
-        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}")
+        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}\n")
+        print("\n", "="*100, "\n")
+        
+        print("Classification report: \n", classification_report(tgt_np, pred_np, target_names=model.names))
+        clsf_report = pd.DataFrame(classification_report(y_true = tgt_np, y_pred = pred_np, output_dict=True)).transpose()
+        clsf_report.to_csv(f'{save_dir}/classification_report.csv', index= True)
+
+        cm = confusion_matrix(tgt_np, pred_np)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.names)
+
+        # Save the confusion matrix to a file
+        disp.plot(cmap='Blues')  # You can specify a color map if you'd like, like 'Blues' for better visualization
+        plt.savefig(f"{save_dir}/confusion_matrix.png")  # Save the confusion matrix as a PNG file
+        plt.close()  # Close the plot to free memory
 
     return top1, top5, loss
 
