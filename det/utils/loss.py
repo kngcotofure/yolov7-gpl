@@ -298,3 +298,31 @@ class ELMLoss(nn.Module):
         output = torch.where(index, x_m, x)
 
         return F.cross_entropy(self.s*output, target, weight=self.weight)
+    
+class CLSQFocalLoss(nn.Module):
+  def __init__(self, num_classes, fl_gamma=1.5, pos_weight=1.0, label_smoothing=0.0):
+      super().__init__()
+      BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(pos_weight))
+
+      # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
+      self.cp, self.cn = smooth_BCE(eps=label_smoothing)  # positive, negative BCE targets
+
+      # Focal loss gamma
+      if fl_gamma > 0:
+          BCEcls = FocalLoss(BCEcls, fl_gamma)
+          
+      self.BCEcls = BCEcls
+      self.nc = num_classes
+
+  def __call__(self, pred, targets):
+      device = targets.device
+      n = targets.shape[0]  # number of targets
+      cls = torch.zeros(1, device=device)
+      
+      # Classification
+      if self.nc > 1:  # cls loss (only if multiple classes)
+          t = torch.full_like(pred, self.cn)  # targets
+          t[range(n), targets] = self.cp
+          cls += self.BCEcls(pred, t)
+
+      return cls
